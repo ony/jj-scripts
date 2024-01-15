@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+
+jj-resolve-cid() {
+  [[ $# == 1 ]]
+  jj --no-pager log --no-graph -T change_id -r "$1"
+}
+
+msg() {
+  echo "$*" >&2
+}
+
+fail() {
+  msg "$*"
+  exit 1
+}
+
+sync-amend() {
+  local old_hash new_hash rest
+  local old_cid new_cid
+  while read old_hash new_hash rest; do
+    old_cid=$(jj-resolve-cid "$old_hash")
+    new_cid=$(jj-resolve-cid "$new_hash")
+    cat <<EOS
+# $old_hash $new_hash $rest
+jj backout -r $old_cid -d $new_cid
+EDITOR="$script x-jj-editor-drop-source" jj squash -r '$new_cid+ & description(exact:"backout of commit $old_hash")'
+jj rebase -s $new_cid -d $old_cid
+EDITOR="$script x-jj-editor-keep-source" jj squash -r $new_cid
+jj --no-pager log -p
+EOS
+  done | eval "(set -eo pipefail; $(cat))"
+}
+
+set -exo pipefail
+
+readonly script=$(realpath "$0")
+
+case "$1" in
+amend) "sync-$1" ;;
+x-jj-editor-drop-source) sed -i -e '/^JJ:.* from the source commit:/,$d' "$2"; exit; ;;
+x-jj-editor-keep-source) sed -i -e '0,/^JJ:.* from the source commit:/d' "$2"; exit; ;;
+*) fail "Unsupported event $1" ;;
+esac
+
