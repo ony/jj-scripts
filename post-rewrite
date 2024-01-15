@@ -26,11 +26,12 @@ sync-amend() {
 jj backout -r $old_cid -d $new_cid
 # Squashed -A into A' preserving original commit message. Now new A* have only
 # commit message and no files. But all descendants of A' are preserved.
-EDITOR="$script x-jj-editor-drop-source" \
+EDITOR="$script x-jj-editor-drop-backout $old_hash" \
   jj squash -r '$new_cid+ & description(exact:"backout of commit $old_hash")'
 # Move A* tree on top of original A and squash it overwriting commit message
 jj rebase -s $new_cid -d $old_cid
-EDITOR="$script x-jj-editor-keep-source" \
+jj describe -r $old_cid -m '' # truncate old message in favor of new one
+EDITOR="true" \
   jj squash -r $new_cid
 EOS
   done | (set -eo pipefail; eval "$(cat)")
@@ -42,8 +43,7 @@ readonly script=$(realpath "$0")
 
 case "$1" in
 amend) "sync-$1" ;;
-x-jj-editor-drop-source) sed -i -e '/^JJ:.* from the source commit:/,$d' "$2"; exit; ;;
-x-jj-editor-keep-source) sed -i -e '0,/^JJ:.* from the source commit:/d' "$2"; exit; ;;
+x-jj-editor-drop-backout) sed -i -e "/^backout of commit $2$/d" "$3"; exit; ;;
 *) fail "Unsupported event $1" ;;
 esac
 
