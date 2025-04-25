@@ -65,7 +65,7 @@ cd-tmp-git-repo() {
   cd-tmpdir
   git init
   ln -s "$hook_path" .git/hooks/
-  jj init --git-repo=.
+  jj git init --colocate
 }
 
 grep-output() {

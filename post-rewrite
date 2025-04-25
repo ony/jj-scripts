@@ -27,7 +27,7 @@ jj backout -r $old_cid -d $new_cid
 # Squashed -A into A' preserving original commit message. Now new A* have only
 # commit message and no files. But all descendants of A' are preserved.
 EDITOR="$script x-jj-editor-drop-backout $old_hash" \
-  jj squash -r '$new_cid+ & description(exact:"backout of commit $old_hash")'
+  jj squash -r '$new_cid+ & description(regex:"back.* commit $old_hash")'
 # Move A* tree on top of original A and squash it overwriting commit message
 jj rebase -s $new_cid -d $old_cid
 jj describe -r $old_cid -m '' # truncate old message in favor of new one
