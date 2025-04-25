@@ -14,6 +14,43 @@ fail() {
   exit 1
 }
 
+# State after git amend
+#
+#  A‥‥A′
+#  │ ╱
+#  B
+#
+# Idea to fix:
+#
+# 1. Backout old A on top of A′ (-A)
+#
+#    -A
+#   ⋰ │
+#  A  A′
+#  │ ╱
+#  B
+#
+# 2. Squash -A into A′ which results in diff between A and A′ likely conflicting.
+#
+#  A  A*
+#  │ ╱
+#  B
+#
+# 3. Rebase that to A which resolves conflict
+#
+#  A*
+#  │ ⋱
+#  A  A*
+#  │ ╱
+#  B
+#
+# 4. Squash it into A
+#
+#  A′
+#  │
+#  B
+#
+
 sync-amend() {
   local old_hash new_hash rest
   local old_cid new_cid
