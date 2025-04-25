@@ -111,4 +111,21 @@ test-git-amend-middle() {
   jj --no-pager log --patch | { ! grep-output ': Hi file old.'; } || return 1
 }
 
+test-git-amend-middle_out_of_jj() {
+  cd-tmp-git-repo
+  jj describe -m 'First'
+  echo 'Hi file old.' > hi.txt
+  jj new -m 'Second'
+  echo 'Hi file new.' > hi.txt
+  jj new
+  git diff HEAD
+  git log --oneline
+  git checkout --detach 'HEAD^'
+  grep-output 'Hi file old.' < hi.txt || return 1
+  echo 'Hi file amended.' > hi.txt
+  git commit --amend --all --no-edit -m 'First amended'
+  jj --no-pager log --patch | grep-output ': Hi file amended.' || return 1
+  jj --no-pager log --patch | { ! grep-output ': Hi file old.'; } || return 1
+}
+
 run-tests

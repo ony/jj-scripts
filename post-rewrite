@@ -5,6 +5,11 @@ jj-resolve-cid() {
   jj --no-pager log --no-graph --template change_id --revisions "$1"
 }
 
+jj-resolve-commit() {
+  [[ $# == 1 ]]
+  jj --no-pager log --no-graph --template commit_id --revisions "$1"
+}
+
 msg() {
   echo "$*" >&2
 }
@@ -14,8 +19,10 @@ fail() {
   exit 1
 }
 
-# State after git amend (assuming top)
+# Let's assume next state after git amend. Though, not sure C′ is possible with just amend.
 #
+#  C  C′
+#  │  │
 #  A‥‥A′
 #  │ ╱
 #  B
@@ -24,32 +31,40 @@ fail() {
 #
 # 1. Backout old A on top of A′ (-A)
 #
-#    -A
-#   ⋰ │
+#  C -A  C′
+#  │⋰ │ ╱
 #  A  A′
 #  │ ╱
 #  B
 #
 # 2. Squash -A into A′ which results in diff between A and A′ likely conflicting.
 #
+#  C  C*
+#  │  │
 #  A  A*
 #  │ ╱
 #  B
 #
 # 3. Rebase that to A which resolves conflict
 #
-#  A*
-#  │ ⋱
-#  A  A*
-#  │ ╱
-#  B
+#     C*
+#     │
+#  C  A*
+#   ╲ │ ⋱
+#     A  A*
+#     │ ╱
+#     B
 #
 # 4. Squash it into A
 #
-#  A′
-#  │
-#  B
+#  C  C′
+#   ╲ │
+#     A′
+#     │
+#     B
 #
+# Note that C′ will get new Git hash after this manipulations. Hence, we
+# write scenario first with resolved JJ change id before doing any changes.
 
 sync-amend() {
   local old_hash new_hash rest
@@ -60,12 +75,15 @@ sync-amend() {
     [[ "$old_cid" == "$new_cid" ]] && continue  # looks like Jujutsu handled it transparently
     cat <<EOS
 # $old_hash $new_hash $rest
+# note that commit hashe might have changed by moment of executing this section
+updated_old_hash=\$(jj-resolve-commit $old_cid)
+
 jj backout --revisions $old_cid --destination $new_cid
 
 # Squashing -A into A' preserving original commit message.
 # Leaving new A* have only commit message and changes without A.
 
-a_star=\$(jj-resolve-cid '$new_cid+ & description(regex:"back.* commit $old_hash")')
+a_star=\$(jj-resolve-cid '$new_cid+ & description(regex:"back.* commit '"\$updated_old_hash"'")')
 
 jj squash --use-destination-message --revision "\$a_star"
 
