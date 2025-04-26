@@ -128,4 +128,20 @@ test-git-amend-middle_out_of_jj() {
   jj --no-pager log --patch | { ! grep-output ': Hi file old.'; } || return 1
 }
 
+test-git-rebase-fixup-reword() {
+  cd-tmp-git-repo
+  jj describe -m 'First'
+  echo 'Hi file old.' > hi.txt
+  jj new -m 'Second'
+  echo 'Hi file middle.' > hi.txt
+  jj new -m 'Third'
+  echo 'Hi file new.' > hi.txt
+  jj new
+  GIT_EDITOR="sed -i '2,\$s/^[^#]/Updated &/'" git commit --fixup=reword:'HEAD^'
+  git rebase --autosquash 'HEAD^^^'
+  git log | grep-output 'Updated Second' || return 1
+  git show | grep-output Third || return 1
+  # Until we support rebases jj log will show split history
+}
+
 run-tests

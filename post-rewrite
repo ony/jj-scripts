@@ -99,7 +99,14 @@ EOS
 set -exo pipefail
 
 case "$1" in
-amend) "sync-$1" ;;
+amend)
+  if [[ -r ".git/rebase-merge/git-rebase-todo" ]] \
+    || [[ -r "rebase-merge/git-rebase-todo" ]]; then
+    fail "No support for $1 during rebase"
+  else
+    "sync-$1"
+  fi
+  ;;
 *) fail "Unsupported event $1" ;;
 esac
 
