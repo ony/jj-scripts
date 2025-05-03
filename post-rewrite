@@ -96,6 +96,15 @@ EOS
   done | (set -eo pipefail; eval "$(cat)")
 }
 
+apply-workarounds() {
+  # work-around for https://github.com/jj-vcs/jj/issues/6437
+  # As per https://git-scm.com/docs/githooks hooks supposed to start from
+  # work-tree or repo dir in case of bare. So next should always be true.
+  if [[ "$(realpath --relative-to=. "${GIT_WORK_TREE:-.}")" == "." ]]; then
+    unset GIT_WORK_TREE
+  fi
+}
+
 set -exo pipefail
 
 case "$1" in
@@ -104,7 +113,10 @@ amend)
     || [[ -r "rebase-merge/git-rebase-todo" ]]; then
     fail "No support for $1 during rebase"
   else
-    "sync-$1"
+    (
+      apply-workarounds
+      "sync-$1"
+    )
   fi
   ;;
 *) fail "Unsupported event $1" ;;

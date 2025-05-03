@@ -118,7 +118,6 @@ test-git-amend-middle_out_of_jj() {
   jj new -m 'Second'
   echo 'Hi file new.' > hi.txt
   jj new
-  git diff HEAD
   git log --oneline
   git checkout --detach 'HEAD^'
   grep-output 'Hi file old.' < hi.txt || return 1
@@ -126,6 +125,27 @@ test-git-amend-middle_out_of_jj() {
   git commit --amend --all --no-edit -m 'First amended'
   jj --no-pager log --patch | grep-output ': Hi file amended.' || return 1
   jj --no-pager log --patch | { ! grep-output ': Hi file old.'; } || return 1
+}
+
+test-git-amend-message-only() {
+  cd-tmp-git-repo
+  jj describe -m 'Change without amend'
+  jj new
+  git commit --amend --allow-empty --only --message 'Change amended message only' || return 1
+  jj --no-pager log | grep-output 'Change amended message only' || return 1
+  jj --no-pager log | { ! grep-output 'Change without amend'; } || return 1
+}
+
+test-git-amend-message-only-with-explicit-work-tree() {
+  cd-tmp-git-repo
+  jj describe -m 'Change without amend'
+  jj new
+  local work_tree="$PWD"
+  cd-tmpdir
+  git --git-dir="$work_tree/.git" --work-tree="$work_tree" commit --amend --allow-empty --only --message 'Change amended message only' || return 1
+  cd "$work_tree"
+  jj --no-pager log | grep-output 'Change amended message only' || return 1
+  jj --no-pager log | { ! grep-output 'Change without amend'; } || return 1
 }
 
 test-git-rebase-fixup-reword() {
