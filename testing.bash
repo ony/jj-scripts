@@ -102,7 +102,7 @@ test-git-amend-middle() {
   echo 'Hi file old.' > hi.txt
   jj new -m 'Second'
   echo 'Hi file new.' > hi.txt
-  jj co @-
+  jj new @-
   echo 'Hi file amended.' > hi.txt
   jj --no-pager log
   git commit --amend --all --no-edit -m 'First amended'
