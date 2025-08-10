@@ -69,13 +69,35 @@ fail() {
 sync-amend() {
   local old_hash new_hash rest
   local old_cid new_cid
-  while read -r old_hash new_hash rest; do
-    old_cid=$(jj-resolve-cid "$old_hash")  # A
-    new_cid=$(jj-resolve-cid "$new_hash")  # A'
-    [[ "$old_cid" == "$new_cid" ]] && continue  # looks like Jujutsu handled it transparently
-    cat <<EOS
+  local script
+  script=$(
+    while read -r old_hash new_hash rest; do
+      old_cid=$(jj-resolve-cid "$old_hash")  # A
+      new_cid=$(jj-resolve-cid "$new_hash")  # A'
+      if [[ "$old_cid" == "$new_cid" ]]; then
+        cat <<EOS
 # $old_hash $new_hash $rest
-# note that commit hashe might have changed by moment of executing this section
+# note that old commit hash might have changed by moment of executing this section
+# but new one supposed to be the same as it diverged from history branches
+updated_old_hash=\$(jj-resolve-commit "$old_cid ~ $new_hash")
+
+jj revert --revisions \$updated_old_hash --destination \$updated_old_hash
+
+# Squashing -A into A' preserving original commit message.
+# Leaving new A* have only commit message and changes without A.
+
+a_star=\$(jj-resolve-cid "\$updated_old_hash"'+ & description(regex:"(back|revert).* commit '"\$updated_old_hash"'")')
+
+jj rebase --source $new_hash --destination "\$a_star" --keep-divergent
+jj desc --message "" "\$a_star"
+EDITOR=true jj squash --revision "\$a_star+"
+jj desc --message "" "\$a_star-"
+EDITOR=true jj squash --revision "\$a_star"
+EOS
+      else
+        cat <<EOS
+# $old_hash $new_hash $rest
+# note that commit hash might have changed by moment of executing this section
 updated_old_hash=\$(jj-resolve-commit $old_cid)
 
 jj backout --revisions $old_cid --destination $new_cid
@@ -83,7 +105,7 @@ jj backout --revisions $old_cid --destination $new_cid
 # Squashing -A into A' preserving original commit message.
 # Leaving new A* have only commit message and changes without A.
 
-a_star=\$(jj-resolve-cid '$new_cid+ & description(regex:"back.* commit '"\$updated_old_hash"'")')
+a_star=\$(jj-resolve-cid '$new_cid+ & description(regex:"(back|revert).* commit '"\$updated_old_hash"'")')
 
 jj squash --use-destination-message --revision "\$a_star"
 
@@ -93,7 +115,9 @@ jj describe --message '' $old_cid # truncate old message in favor of new one
 EDITOR="true" \
   jj squash --revision $new_cid
 EOS
-  done | (set -eo pipefail; eval "$(cat)")
+      fi
+    done) || return $?
+  (set -eo pipefail; eval "$script")
 }
 
 apply-workarounds() {
